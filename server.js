@@ -1,0 +1,14 @@
+const express=require("express"), PDFDocument=require("pdfkit");
+const app=express(); app.use(express.json({limit:"1mb"})); app.use(express.static("public"));
+const PORT=process.env.PORT||3000, KEY=process.env.ADMIN_KEY||"CHANGE_ME";
+const RESEND=process.env.RESEND_API_KEY||"", FROM=process.env.RESEND_FROM||"Green Moon <onboarding@resend.dev>";
+let orders=[], seq=10001;
+app.post("/api/orders",(q,s)=>{const {customer,items,total}=q.body||{};if(!customer?.name||!customer?.phone||!customer?.address||!customer?.city||!items?.length)return s.status(400).json({error:"بيانات الطلب ناقصة"});const o={number:"GM-"+seq++,customer,items,total,status:"NEW",createdAt:new Date().toISOString()};orders.unshift(o);s.json({ok:true,number:o.number})});
+function auth(q,s,n){if(q.headers["x-admin-key"]!==KEY)return s.status(401).json({error:"Unauthorized"});n()}
+app.get("/api/orders",auth,(q,s)=>s.json(orders));
+function pdf(o){return new Promise((ok,er)=>{let d=new PDFDocument({margin:45}),a=[];d.on("data",x=>a.push(x));d.on("end",()=>ok(Buffer.concat(a)));d.on("error",er);d.fontSize(20).text("GREEN MOON PLANTS & FLOWERS",{align:"center"}).moveDown();d.fontSize(14).text("Invoice #"+o.number).moveDown();d.fontSize(11).text("Customer: "+o.customer.name).text("Phone: "+o.customer.phone).text("Address: "+o.customer.address+", "+o.customer.city).moveDown();o.items.forEach(i=>d.text(`${i.name} — ${i.qty} x ${i.price} EGP — Delivery: ${i.deliveryText||""}`));d.moveDown().fontSize(14).text("Total: "+o.total+" EGP");d.end()})}
+async function mail(o,b){if(!RESEND||!o.customer.email)return false;let r=await fetch("https://api.resend.com/emails",{method:"POST",headers:{Authorization:"Bearer "+RESEND,"Content-Type":"application/json"},body:JSON.stringify({from:FROM,to:[o.customer.email],subject:"تم تأكيد طلبك #"+o.number+" - Green Moon",text:"تم تأكيد طلبك. الفاتورة مرفقة.",attachments:[{filename:"GreenMoon-"+o.number+".pdf",content:b.toString("base64")}]})});if(!r.ok)throw Error(await r.text());return true}
+app.post("/api/orders/:n/confirm",auth,async(q,s)=>{let o=orders.find(x=>x.number===q.params.n);if(!o)return s.status(404).json({error:"Not found"});o.status="CONFIRMED";let e=false;try{e=await mail(o,await pdf(o))}catch(x){o.emailError=x.message}s.json({ok:true,results:{email:e},order:o})});
+app.get("/api/invoice/:n",auth,async(q,s)=>{let o=orders.find(x=>x.number===q.params.n);if(!o)return s.sendStatus(404);s.type("pdf").send(await pdf(o))});
+app.get("/admin",(q,s)=>s.sendFile(require("path").join(__dirname,"public","admin.html")));
+app.listen(PORT,"0.0.0.0",()=>console.log("Green Moon on "+PORT));
