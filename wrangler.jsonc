@@ -1,8 +1,13 @@
 {
   "$schema": "https://developers.cloudflare.com/workers/wrangler/config-schema.json",
-  "name": "greenmoonplantss",
+  "name": "greenmoon-plants",
   "main": "./index.js",
   "compatibility_date": "2026-08-19",
+
+  "ai": {
+    "binding": "AI"
+  },
+
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
