@@ -103,7 +103,7 @@ ${context}
 
       try {
         result = await env.AI.run(
-          "@cf/meta/llama-3.1-8b-instruct-fp8",
+          "@cf/meta/llama-3.1-8b-instruc@cf/meta/llama-3.1-8b-instruct-fast-fp8
           {
             messages: [
               {
